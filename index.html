@@ -30,11 +30,12 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
 
-        // Add a flat plane
-        const planeGeometry = new THREE.PlaneGeometry(100, 100); // Large plane
+        // Add a flat plane (terrain)
+        const planeGeometry = new THREE.PlaneGeometry(1000, 1000); // Much larger plane for expansive terrain
         const planeMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
         plane.rotation.x = -Math.PI / 2; // Rotate the plane to be horizontal
+        plane.name = 'terrain'; // Give the plane a name for raycasting
         scene.add(plane);
 
         // Add a skybox
@@ -49,11 +50,51 @@
         });
 
         // Position camera
-        camera.position.set(0, 10, 20); // Move camera up and back to see the plane
+        const initialCameraHeight = 10;
+        camera.position.set(0, initialCameraHeight, 20); // Move camera up and back to see the plane
+        camera.lookAt(0, 0, 0); // Look towards the center of the plane
+
+        // Raycasting for click-to-move
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let targetPosition = new THREE.Vector3().copy(camera.position); // Start at current camera position
+
+        function onCanvasClick(event) {
+            // Calculate mouse position in normalized device coordinates (-1 to +1)
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // Update the picking ray with the camera and mouse position
+            raycaster.setFromCamera(mouse, camera);
+
+            // Find intersections with the plane
+            const intersects = raycaster.intersectObject(plane);
+
+            if (intersects.length > 0) {
+                // Get the first intersection point (the one closest to the camera)
+                const intersectionPoint = intersects[0].point;
+
+                // Set the target position, maintaining the camera's desired height
+                targetPosition.copy(intersectionPoint);
+                targetPosition.y = initialCameraHeight; // Maintain a fixed height above the ground
+            }
+        }
+
+        // Add event listener for clicks
+        canvas.addEventListener('click', onCanvasClick, false);
 
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
+
+            // Move camera towards the target position
+            // Only move if the target position is different and the distance is significant
+            if (camera.position.distanceToSquared(targetPosition) > 0.1) {
+                // Use lerp (linear interpolation) for smooth movement
+                camera.position.lerp(targetPosition, 0.05); // Adjust the second parameter (alpha) for speed
+                 // Optional: Make the camera look slightly towards the direction of movement or the target
+                 // Let's keep it simple and just move for now.
+            }
 
             renderer.render(scene, camera);
         }
